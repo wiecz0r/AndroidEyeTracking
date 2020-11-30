@@ -44,7 +44,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         this.imageWidth = width;
         this.imageHeight = height;
 
-//        outputImage = new Mat(height, width, CvType.CV_8UC4);
+        outputImage = new Mat(height, width, CvType.CV_8UC4);
         scaledGrayImage = new Mat(getScaledHeight(), getScaledWidth(), CvType.CV_8UC1);
         scaledSize = new Size(getScaledWidth(), getScaledHeight());
     }
@@ -92,9 +92,8 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             );
         }
 
-//        inputImage.copyTo(outputImage);
-//        inputImage.release();
-        outputImage = inputImage;
+        inputImage.copyTo(outputImage);
+        inputImage.release();
     }
 
 }
