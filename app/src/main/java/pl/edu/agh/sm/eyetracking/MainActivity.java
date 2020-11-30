@@ -2,12 +2,18 @@ package pl.edu.agh.sm.eyetracking;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.objdetect.CascadeClassifier;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -15,13 +21,15 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getCanonicalName();
 
     private FrontalCameraView cameraBridgeViewBase;
-    private final EyeTrackingProcessor eyeTrackingProcessor = new EyeTrackingProcessor();
+    private EyeTrackingProcessor eyeTrackingProcessor;
+    private CascadeClassifier faceDetector;
 
     private final BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
             switch (status) {
                 case LoaderCallbackInterface.SUCCESS:
+                    loadClassifier();
                     enableCameraView();
                     break;
                 default:
@@ -38,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         cameraBridgeViewBase = findViewById(R.id.frontal_camera_view);
-        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
+//        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
     }
 
     @Override
@@ -66,6 +74,35 @@ public class MainActivity extends AppCompatActivity {
     public void onDestroy() {
         super.onDestroy();
         disableCameraView();
+    }
+
+    private void loadClassifier() {
+        File cascadeFile = loadFile();
+        faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
+        faceDetector.load(cascadeFile.getAbsolutePath());
+        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector);
+        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
+    }
+
+    private File loadFile() {
+        try {
+            InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_alt2);
+            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+            File cascadeFile = new File(cascadeDir, "haarcascade_frontalface_alt2.xml");
+            FileOutputStream fos = new FileOutputStream(cascadeFile);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                fos.write(buffer, 0, bytesRead);
+            }
+            is.close();
+            fos.close();
+            cascadeDir.delete();
+            return cascadeFile;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return null;
+        }
     }
 
     private void enableCameraView() {
