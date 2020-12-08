@@ -1,5 +1,7 @@
 package pl.edu.agh.sm.eyetracking;
 
+import android.util.Log;
+
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -14,18 +16,20 @@ import org.opencv.objdetect.CascadeClassifier;
 
 public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewListener2 {
 
-    private Mat outputImage;
-    private Mat scaledGrayImage;
-    private Size scaledSize;
-
-    private int imageWidth;
-    private int imageHeight;
+    private static final String TAG = EyeTrackingProcessor.class.getCanonicalName();
+    private static final int EPS_CENTER = 2;
+    private static final int EPS_SIZE = 5;
+    private final int SCALE = 8;
 
     private final CascadeClassifier faceDetector;
 
+    private Mat outputImage;
+    private Mat scaledGrayImage;
+    private Size scaledSize;
+    private Face face;
 
-    private final int SCALE = 8;
-
+    private int imageWidth;
+    private int imageHeight;
 
     EyeTrackingProcessor(CascadeClassifier classifier) {
         faceDetector = classifier;
@@ -43,6 +47,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     public void onCameraViewStarted(int width, int height) {
         this.imageWidth = width;
         this.imageHeight = height;
+        this.face = new Face(width, height);
 
         outputImage = new Mat(height, width, CvType.CV_8UC4);
         scaledGrayImage = new Mat(getScaledHeight(), getScaledWidth(), CvType.CV_8UC1);
@@ -82,18 +87,65 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 //        progressMat.copyTo(inputImage.submat(new Rect(0, 0, (int) scaledSize.width, (int) scaledSize.height)));
 //        progressMat.release();
 
-        // draw red rectangles for detected faces
+        if (faces.toArray().length > 0) {
+            Rect biggestFace = getBiggestFace(faces);
+            faceStabilization(biggestFace);
+            Rect rect = face.getRect();
+
+            // draw red rectangle for biggest stabilized detected face
+            Log.d(TAG, rect.toString());
+            drawRectangle(inputImage, rect, new Scalar(255, 0, 0), 3);
+        }
+
+        // DEBUG - draw green rectangles for all detected faces
         for (Rect rect : faces.toArray()) {
-            Imgproc.rectangle(inputImage,
-                    new Point(rect.x * SCALE, rect.y * SCALE),
-                    new Point((rect.x + rect.width) * SCALE, (rect.y + rect.height) * SCALE),
-                    new Scalar(255, 0, 0),
-                    3
-            );
+            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
         }
 
         inputImage.copyTo(outputImage);
         inputImage.release();
+    }
+
+    private Rect getBiggestFace(MatOfRect faces) {
+        Rect biggestFace = faces.toArray()[0];
+        for (Rect rect : faces.toArray()) {
+            if (rect.area() > biggestFace.area()) {
+                biggestFace = rect;
+            }
+        }
+        return biggestFace;
+    }
+
+    private void faceStabilization(Rect biggestFace) {
+        Point center = new Point(
+                biggestFace.x + (biggestFace.width >> 1),
+                biggestFace.y + (biggestFace.height >> 1)
+        );
+
+        if (Math.abs(center.x - face.getCenter().x) > EPS_CENTER
+                || Math.abs(center.y - face.getCenter().y) > EPS_CENTER) {
+            face.setCenter(center);
+        }
+        if (Math.abs(biggestFace.width - face.getSize()) > EPS_SIZE) {
+            face.setSize(biggestFace.width);
+        }
+    }
+
+    private void drawRectangle(Mat inputImage, Rect rect, Scalar color, int thickness) {
+        scale(rect);
+        Imgproc.rectangle(inputImage,
+                new Point(rect.x, rect.y),
+                new Point(rect.x + rect.width, rect.y + rect.height),
+                color,
+                thickness
+        );
+    }
+
+    private void scale(Rect rect) {
+        rect.x *= SCALE;
+        rect.y *= SCALE;
+        rect.width *= SCALE;
+        rect.height *= SCALE;
     }
 
 }
