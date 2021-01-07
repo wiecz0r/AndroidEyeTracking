@@ -89,6 +89,8 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
         detectFace(inputImage);
 
+        Core.flip(inputImage, inputImage, 1);
+
         inputImage.copyTo(outputImage);
         inputImage.release();
     }
@@ -231,6 +233,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         stddev.release();
         mask.release();
     }
+
 
     private Rect getEyeRect(Mat faceROI, Rect eye) {
         Point p1 = new Point(0, 0);
