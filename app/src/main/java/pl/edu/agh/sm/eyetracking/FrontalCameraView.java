@@ -9,6 +9,6 @@ public class FrontalCameraView extends JavaCameraView {
 
     public FrontalCameraView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mCameraIndex = CAMERA_ID_FRONT;
+        mCameraIndex = CAMERA_ID_BACK;
     }
 }

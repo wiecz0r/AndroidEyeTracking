@@ -9,6 +9,7 @@ import android.util.Log;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.face.Facemark;
 import org.opencv.objdetect.CascadeClassifier;
 
 import java.io.File;
@@ -23,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private FrontalCameraView cameraBridgeViewBase;
     private EyeTrackingProcessor eyeTrackingProcessor;
     private CascadeClassifier faceDetector;
+    private Facemark facemark;
 
     private final BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -77,19 +79,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadClassifier() {
-        File cascadeFile = loadFile();
+        File cascadeFile = loadFile(R.raw.haarcascade_frontalface_alt2, "cascade", "haarcascade_frontalface_alt2.xml");
+        File facemarkFile = loadFile(R.raw.face_landmark_model, "landmark", "face_landmark_model.dat");
+
         faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
         faceDetector.load(cascadeFile.getAbsolutePath());
-        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector);
+
+        facemark = org.opencv.face.Face.createFacemarkKazemi();
+        facemark.loadModel(facemarkFile.getAbsolutePath());
+
+        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector, facemark);
         cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
     }
 
-    private File loadFile() {
+    private File loadFile(int resource, String dir, String filename) {
         try {
-            InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_alt2);
-            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-            File cascadeFile = new File(cascadeDir, "haarcascade_frontalface_alt2.xml");
-            FileOutputStream fos = new FileOutputStream(cascadeFile);
+            InputStream is = getResources().openRawResource(resource);
+            File directory = getDir(dir, Context.MODE_PRIVATE);
+            File file = new File(directory, filename);
+            FileOutputStream fos = new FileOutputStream(file);
             byte[] buffer = new byte[4096];
             int bytesRead;
             while ((bytesRead = is.read(buffer)) != -1) {
@@ -97,8 +105,8 @@ public class MainActivity extends AppCompatActivity {
             }
             is.close();
             fos.close();
-            cascadeDir.delete();
-            return cascadeFile;
+            directory.delete();
+            return file;
         } catch (Exception ex) {
             ex.printStackTrace();
             return null;

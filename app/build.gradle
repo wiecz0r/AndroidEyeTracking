@@ -39,5 +39,6 @@ dependencies {
 
     // last compatible version with SDK 16
     //noinspection GradleDependency
-    implementation 'com.quickbirdstudios:opencv:3.4.5'
+    //implementation 'com.quickbirdstudios:opencv:3.4.5'
+    implementation 'com.quickbirdstudios:opencv:3.4.4-contrib'
 }

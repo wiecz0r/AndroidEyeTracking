@@ -5,13 +5,17 @@ import android.util.Log;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.face.Facemark;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+
+import java.util.ArrayList;
 
 
 public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -19,9 +23,10 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private static final String TAG = EyeTrackingProcessor.class.getCanonicalName();
     private static final int EPS_CENTER = 2;
     private static final int EPS_SIZE = 5;
-    private final int SCALE = 8;
+    private final int SCALE = 6;
 
     private final CascadeClassifier faceDetector;
+    private final Facemark facemark;
 
     private Mat outputImage;
     private Mat scaledGrayImage;
@@ -31,8 +36,9 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private int imageWidth;
     private int imageHeight;
 
-    EyeTrackingProcessor(CascadeClassifier classifier) {
-        faceDetector = classifier;
+    EyeTrackingProcessor(CascadeClassifier classifier, Facemark facemark) {
+        this.faceDetector = classifier;
+        this.facemark = facemark;
     }
 
     private int getScaledWidth() {
@@ -87,10 +93,23 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 //        progressMat.copyTo(inputImage.submat(new Rect(0, 0, (int) scaledSize.width, (int) scaledSize.height)));
 //        progressMat.release();
 
+        ArrayList<MatOfPoint2f> landmarks = new ArrayList<>();
+
         if (faces.toArray().length > 0) {
             Rect biggestFace = getBiggestFace(faces);
             faceStabilization(biggestFace);
             Rect rect = face.getRect();
+            facemark.fit(scaledGrayImage, faces, landmarks);
+
+//            for (int i=0; i<landmarks.size(); i++) {
+                MatOfPoint2f lm = landmarks.get(0);
+                int a = lm.cols();
+                for (int j=36; j<42; j++) {
+                    double [] dp = lm.get(j,0);
+                    Point p = new Point(dp[0] * SCALE, dp[1] * SCALE);
+                    Imgproc.circle(inputImage,p,2,new Scalar(222),1);
+//                }
+            }
 
             // draw red rectangle for biggest stabilized detected face
             Log.d(TAG, rect.toString());
@@ -98,9 +117,9 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         }
 
         // DEBUG - draw green rectangles for all detected faces
-        for (Rect rect : faces.toArray()) {
-            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
-        }
+//        for (Rect rect : faces.toArray()) {
+//            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
+//        }
 
         inputImage.copyTo(outputImage);
         inputImage.release();
