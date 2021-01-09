@@ -19,20 +19,24 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private static final String TAG = EyeTrackingProcessor.class.getCanonicalName();
     private static final int EPS_CENTER = 2;
     private static final int EPS_SIZE = 5;
-    private final int SCALE = 8;
+    private final int SCALE = 4;
 
     private final CascadeClassifier faceDetector;
+    private final CascadeClassifier eyeDetector;
 
     private Mat outputImage;
     private Mat scaledGrayImage;
     private Size scaledSize;
     private Face face;
+    private Rect eye1 = new Rect(0,0,0,0);
+    private Rect eye2 = new Rect(0,0,0,0);
 
     private int imageWidth;
     private int imageHeight;
 
-    EyeTrackingProcessor(CascadeClassifier classifier) {
-        faceDetector = classifier;
+    EyeTrackingProcessor(CascadeClassifier faceClassifier, CascadeClassifier eyeClassifier) {
+        faceDetector = faceClassifier;
+        eyeDetector = eyeClassifier;
     }
 
     private int getScaledWidth() {
@@ -95,15 +99,45 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             // draw red rectangle for biggest stabilized detected face
             Log.d(TAG, rect.toString());
             drawRectangle(inputImage, rect, new Scalar(255, 0, 0), 3);
+
+            detectEyes(inputImage, biggestFace);
         }
 
-        // DEBUG - draw green rectangles for all detected faces
-        for (Rect rect : faces.toArray()) {
-            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
-        }
+//        DEBUG - draw green rectangles for all detected faces
+//        for (Rect rect : faces.toArray()) {
+//            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
+//        }
 
         inputImage.copyTo(outputImage);
         inputImage.release();
+    }
+
+    private void detectEyes(Mat inputImage, Rect biggestFace) {
+        Mat faceROI = scaledGrayImage.submat(biggestFace);
+        MatOfRect eyes = new MatOfRect();
+        eyeDetector.detectMultiScale(
+                faceROI,
+                eyes,
+                1.1
+        );
+
+        Rect[] eyesArray = eyes.toArray();
+        Log.d(TAG, String.valueOf(eyesArray.length));
+        if(eyesArray.length == 2){
+            eye1 = getEyeRect(faceROI, eyesArray[0]);
+            eye2 = getEyeRect(faceROI, eyesArray[1]);
+            drawRectangle(inputImage, eye1, new Scalar(0, 255, 0), 2);
+            drawRectangle(inputImage, eye2, new Scalar(0, 255, 0), 2);
+            Log.d(TAG, "Eye1: " + eye1.toString() + "\tEye2: " + eye2.toString());
+        }
+    }
+
+    private Rect getEyeRect(Mat faceROI, Rect eye) {
+        Point p1 = new Point(0, 0);
+        faceROI.locateROI(null, p1);
+        eye.x += p1.x;
+        eye.y += p1.y;
+        return eye;
     }
 
     private Rect getBiggestFace(MatOfRect faces) {
@@ -147,5 +181,4 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         rect.width *= SCALE;
         rect.height *= SCALE;
     }
-
 }

@@ -23,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
     private FrontalCameraView cameraBridgeViewBase;
     private EyeTrackingProcessor eyeTrackingProcessor;
     private CascadeClassifier faceDetector;
+    private CascadeClassifier eyeDetector;
 
     private final BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -77,19 +78,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadClassifier() {
-        File cascadeFile = loadFile();
+        File cascadeFile = loadFile(R.raw.haarcascade_frontalface_alt2, "cascade", "haarcascade_frontalface_alt2.xml");
+        File eyeFile = loadFile(R.raw.haarcascade_eye, "landmark", "haarcascade_eye.xml");
+
         faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
         faceDetector.load(cascadeFile.getAbsolutePath());
-        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector);
+
+        eyeDetector = new CascadeClassifier(eyeFile.getAbsolutePath());
+        eyeDetector.load(eyeFile.getAbsolutePath());
+
+        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector, eyeDetector);
         cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
     }
 
-    private File loadFile() {
+    private File loadFile(int resource, String dir, String filename) {
         try {
-            InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_alt2);
-            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-            File cascadeFile = new File(cascadeDir, "haarcascade_frontalface_alt2.xml");
-            FileOutputStream fos = new FileOutputStream(cascadeFile);
+            InputStream is = getResources().openRawResource(resource);
+            File directory = getDir(dir, Context.MODE_PRIVATE);
+            File file = new File(directory, filename);
+            FileOutputStream fos = new FileOutputStream(file);
             byte[] buffer = new byte[4096];
             int bytesRead;
             while ((bytesRead = is.read(buffer)) != -1) {
@@ -97,8 +104,8 @@ public class MainActivity extends AppCompatActivity {
             }
             is.close();
             fos.close();
-            cascadeDir.delete();
-            return cascadeFile;
+            directory.delete();
+            return file;
         } catch (Exception ex) {
             ex.printStackTrace();
             return null;
