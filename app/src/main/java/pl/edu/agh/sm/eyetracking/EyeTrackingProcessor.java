@@ -21,6 +21,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private static final int EPS_SIZE = 5;
 
     public static final int EYE_SCALE = 4;
+    public static final int PUPIL_SCALE = 2;
 
     private final CascadeClassifier faceDetector;
     private final CascadeClassifier eyeDetector;
@@ -32,6 +33,9 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private Mat eyeStepImage;
     private Size eyeStepImageSize;
+
+    private Mat pupilStepImage;
+    private Size pupilStepImageSize;
 
     private Face face;
 
@@ -52,13 +56,19 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
         eyeStepImageSize = new Size(width / EYE_SCALE, height / EYE_SCALE);
         eyeStepImage = new Mat(eyeStepImageSize, CvType.CV_8UC1);
+
+        int scaledWidth = width / PUPIL_SCALE;
+        int scaledHeight = height / PUPIL_SCALE;
+        pupilStepImageSize = new Size(scaledWidth, scaledHeight);
+        pupilStepImage = new Mat(pupilStepImageSize, CvType.CV_8UC1);
     }
 
     @Override
     public void onCameraViewStopped() {
-        outputImage.release();
-        faceStepImage.release();
+        pupilStepImage.release();
         eyeStepImage.release();
+        faceStepImage.release();
+        outputImage.release();
     }
 
     @Override
@@ -71,6 +81,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         Mat inputImage = cvCameraViewFrame.rgba();
         Imgproc.resize(cvCameraViewFrame.gray(), faceStepImage, faceStepImageSize);
         Imgproc.resize(cvCameraViewFrame.gray(), eyeStepImage, eyeStepImageSize);
+        Imgproc.resize(cvCameraViewFrame.gray(), pupilStepImage, pupilStepImageSize);
 
         detectFace(inputImage);
 
@@ -134,12 +145,29 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             Log.d(TAG, "Eye: " + eye.toString());
 
             detectPupil(inputImage, eye);
+
+            // debug only
+            break;
         }
     }
 
     private void detectPupil(Mat inputImage, Rect eye) {
-//        Mat eyeROI = faceStepImage.submat(eye);
+        eye.x /= PUPIL_SCALE;
+        eye.y /= PUPIL_SCALE;
+        eye.width /= PUPIL_SCALE;
+        eye.height /= PUPIL_SCALE;
+
+        Mat eyeROI = pupilStepImage.submat(eye);
         //TODO
+
+//        Imgproc.GaussianBlur(eyeROI, eyeROI, new Size(7 ,7), 0, 0);
+        Imgproc.threshold(eyeROI, eyeROI, 64, 255, Imgproc.THRESH_BINARY);
+
+//        Mat progressMat = new Mat(eye.height, eye.width, CvType.CV_8UC4);
+//        Imgproc.cvtColor(eyeROI, progressMat, Imgproc.COLOR_GRAY2RGBA);
+//        progressMat.copyTo(inputImage.submat(new Rect(0, 0, eye.width, eye.height)));
+//        progressMat.release();
+
     }
 
     private Rect getEyeRect(Mat faceROI, Rect eye) {
