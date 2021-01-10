@@ -19,47 +19,46 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private static final String TAG = EyeTrackingProcessor.class.getCanonicalName();
     private static final int EPS_CENTER = 2;
     private static final int EPS_SIZE = 5;
-    private final int SCALE = 4;
+
+    public static final int EYE_SCALE = 4;
 
     private final CascadeClassifier faceDetector;
     private final CascadeClassifier eyeDetector;
 
     private Mat outputImage;
-    private Mat scaledGrayImage;
-    private Size scaledSize;
-    private Face face;
 
-    private int imageWidth;
-    private int imageHeight;
+    private Mat faceStepImage;
+    private Size faceStepImageSize;
+
+    private Mat eyeStepImage;
+    private Size eyeStepImageSize;
+
+    private Face face;
 
     EyeTrackingProcessor(CascadeClassifier faceClassifier, CascadeClassifier eyeClassifier) {
         faceDetector = faceClassifier;
         eyeDetector = eyeClassifier;
     }
 
-    private int getScaledWidth() {
-        return imageWidth / SCALE;
-    }
-
-    private int getScaledHeight() {
-        return imageHeight / SCALE;
-    }
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        this.imageWidth = width;
-        this.imageHeight = height;
         this.face = new Face(width, height);
 
         outputImage = new Mat(height, width, CvType.CV_8UC4);
-        scaledGrayImage = new Mat(getScaledHeight(), getScaledWidth(), CvType.CV_8UC1);
-        scaledSize = new Size(getScaledWidth(), getScaledHeight());
+
+        faceStepImageSize = new Size(width / Face.SCALE,height / Face.SCALE);
+        faceStepImage = new Mat(faceStepImageSize, CvType.CV_8UC1);
+
+        eyeStepImageSize = new Size(width / EYE_SCALE, height / EYE_SCALE);
+        eyeStepImage = new Mat(eyeStepImageSize, CvType.CV_8UC1);
     }
 
     @Override
     public void onCameraViewStopped() {
         outputImage.release();
-        scaledGrayImage.release();
+        faceStepImage.release();
+        eyeStepImage.release();
     }
 
     @Override
@@ -70,7 +69,9 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private void process(CameraBridgeViewBase.CvCameraViewFrame cvCameraViewFrame) {
         Mat inputImage = cvCameraViewFrame.rgba();
-        Imgproc.resize(cvCameraViewFrame.gray(), scaledGrayImage, scaledSize);
+        Imgproc.resize(cvCameraViewFrame.gray(), faceStepImage, faceStepImageSize);
+        Imgproc.resize(cvCameraViewFrame.gray(), eyeStepImage, eyeStepImageSize);
+
         detectFace(inputImage);
 
         inputImage.copyTo(outputImage);
@@ -81,30 +82,34 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         // --- face detection
         MatOfRect faces = new MatOfRect();
         faceDetector.detectMultiScale(
-                scaledGrayImage,
+                faceStepImage,
                 faces,
-                1.1,
-                2,
-                2,
-                new Size(getScaledHeight() >> 2, getScaledHeight() >> 2),
-                new Size(getScaledHeight(), getScaledHeight())
+                1.1 //,
+//                2,
+//                2,
+//                new Size((int) faceStepImageSize.height >> 2, (int) faceStepImageSize.height >> 2),
+//                new Size(faceStepImageSize.height, faceStepImageSize.height)
         );
 
         if (faces.toArray().length > 0) {
             Rect biggestFace = getBiggestFace(faces);
-            faceStabilization(biggestFace);
-            Rect rect = face.getRect();
+            Rect stabilisedFace = stabiliseFace(biggestFace);
 
             // draw red rectangle for biggest stabilized detected face
-            Log.d(TAG, rect.toString());
-            drawRectangle(inputImage, rect, new Scalar(255, 0, 0), 3);
+            Log.d(TAG, stabilisedFace.toString());
+            drawRectangle(inputImage, stabilisedFace, new Scalar(255, 0, 0), 3);
 
-            detectEyes(inputImage, biggestFace);
+            detectEyes(inputImage, stabilisedFace);
         }
     }
 
-    private void detectEyes(Mat inputImage, Rect biggestFace) {
-        Mat faceROI = scaledGrayImage.submat(biggestFace);
+    private void detectEyes(Mat inputImage, Rect face) {
+        face.x /= EYE_SCALE;
+        face.y /= EYE_SCALE;
+        face.width /= EYE_SCALE;
+        face.height /= EYE_SCALE;
+
+        Mat faceROI = eyeStepImage.submat(face);
         MatOfRect eyes = new MatOfRect();
         eyeDetector.detectMultiScale(
                 faceROI,
@@ -119,6 +124,11 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         for (Rect rect : eyesArray) {
             Rect eye = getEyeRect(faceROI, rect);
 
+            eye.x *= EYE_SCALE;
+            eye.y *= EYE_SCALE;
+            eye.width *= EYE_SCALE;
+            eye.height *= EYE_SCALE;
+
             // draw green rectangle for detected eye
             drawRectangle(inputImage, eye, new Scalar(0, 255, 0), 2);
             Log.d(TAG, "Eye: " + eye.toString());
@@ -128,7 +138,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     }
 
     private void detectPupil(Mat inputImage, Rect eye) {
-        Mat eyeROI = scaledGrayImage.submat(eye);
+//        Mat eyeROI = faceStepImage.submat(eye);
         //TODO
     }
 
@@ -150,7 +160,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         return biggestFace;
     }
 
-    private void faceStabilization(Rect biggestFace) {
+    private Rect stabiliseFace(Rect biggestFace) {
         Point center = new Point(
                 biggestFace.x + (biggestFace.width >> 1),
                 biggestFace.y + (biggestFace.height >> 1)
@@ -163,22 +173,16 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         if (Math.abs(biggestFace.width - face.getSize()) > EPS_SIZE) {
             face.setSize(biggestFace.width);
         }
+
+        return face.getRect();
     }
 
     private void drawRectangle(Mat inputImage, Rect rect, Scalar color, int thickness) {
-        scale(rect);
         Imgproc.rectangle(inputImage,
                 new Point(rect.x, rect.y),
                 new Point(rect.x + rect.width, rect.y + rect.height),
                 color,
                 thickness
         );
-    }
-
-    private void scale(Rect rect) {
-        rect.x *= SCALE;
-        rect.y *= SCALE;
-        rect.width *= SCALE;
-        rect.height *= SCALE;
     }
 }
