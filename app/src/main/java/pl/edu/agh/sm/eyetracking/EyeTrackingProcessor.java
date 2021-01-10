@@ -28,8 +28,6 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private Mat scaledGrayImage;
     private Size scaledSize;
     private Face face;
-    private Rect eye1 = new Rect(0,0,0,0);
-    private Rect eye2 = new Rect(0,0,0,0);
 
     private int imageWidth;
     private int imageHeight;
@@ -72,8 +70,14 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private void process(CameraBridgeViewBase.CvCameraViewFrame cvCameraViewFrame) {
         Mat inputImage = cvCameraViewFrame.rgba();
-
         Imgproc.resize(cvCameraViewFrame.gray(), scaledGrayImage, scaledSize);
+        detectFace(inputImage);
+
+        inputImage.copyTo(outputImage);
+        inputImage.release();
+    }
+
+    private void detectFace(Mat inputImage) {
         // --- face detection
         MatOfRect faces = new MatOfRect();
         faceDetector.detectMultiScale(
@@ -86,11 +90,6 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
                 new Size(getScaledHeight(), getScaledHeight())
         );
 
-//        Mat progressMat = new Mat((int) scaledSize.height, (int) scaledSize.width, CvType.CV_8UC4);
-//        Imgproc.cvtColor(scaledGrayImage, progressMat, Imgproc.COLOR_GRAY2RGBA);
-//        progressMat.copyTo(inputImage.submat(new Rect(0, 0, (int) scaledSize.width, (int) scaledSize.height)));
-//        progressMat.release();
-
         if (faces.toArray().length > 0) {
             Rect biggestFace = getBiggestFace(faces);
             faceStabilization(biggestFace);
@@ -102,14 +101,6 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
             detectEyes(inputImage, biggestFace);
         }
-
-//        DEBUG - draw green rectangles for all detected faces
-//        for (Rect rect : faces.toArray()) {
-//            drawRectangle(inputImage, rect, new Scalar(0, 255, 0), 2);
-//        }
-
-        inputImage.copyTo(outputImage);
-        inputImage.release();
     }
 
     private void detectEyes(Mat inputImage, Rect biggestFace) {
@@ -122,14 +113,23 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         );
 
         Rect[] eyesArray = eyes.toArray();
-        Log.d(TAG, String.valueOf(eyesArray.length));
-        if(eyesArray.length == 2){
-            eye1 = getEyeRect(faceROI, eyesArray[0]);
-            eye2 = getEyeRect(faceROI, eyesArray[1]);
-            drawRectangle(inputImage, eye1, new Scalar(0, 255, 0), 2);
-            drawRectangle(inputImage, eye2, new Scalar(0, 255, 0), 2);
-            Log.d(TAG, "Eye1: " + eye1.toString() + "\tEye2: " + eye2.toString());
+        //Log.d(TAG, String.valueOf(eyesArray.length));
+
+        // iterate detected eyes
+        for (Rect rect : eyesArray) {
+            Rect eye = getEyeRect(faceROI, rect);
+
+            // draw green rectangle for detected eye
+            drawRectangle(inputImage, eye, new Scalar(0, 255, 0), 2);
+            Log.d(TAG, "Eye: " + eye.toString());
+
+            detectPupil(inputImage, eye);
         }
+    }
+
+    private void detectPupil(Mat inputImage, Rect eye) {
+        Mat eyeROI = scaledGrayImage.submat(eye);
+        //TODO
     }
 
     private Rect getEyeRect(Mat faceROI, Rect eye) {
