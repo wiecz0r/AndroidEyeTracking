@@ -3,13 +3,17 @@ package pl.edu.agh.sm.eyetracking;
 import android.util.Log;
 
 import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
+import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 
@@ -110,6 +114,10 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             Log.d(TAG, stabilisedFace.toString());
             drawRectangle(inputImage, stabilisedFace, new Scalar(255, 0, 0), 3);
 
+            if (stabilisedFace.x + stabilisedFace.width > 1280) return;
+            if (stabilisedFace.y + stabilisedFace.height > 720) return;
+            if (stabilisedFace.x < 0 || stabilisedFace.y < 0) return;
+
             detectEyes(inputImage, stabilisedFace);
         }
     }
@@ -149,6 +157,8 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             // debug only
             break;
         }
+
+        faceROI.release();
     }
 
     private void detectPupil(Mat inputImage, Rect eye) {
@@ -158,16 +168,65 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         eye.height /= PUPIL_SCALE;
 
         Mat eyeROI = pupilStepImage.submat(eye);
-        //TODO
 
-//        Imgproc.GaussianBlur(eyeROI, eyeROI, new Size(7 ,7), 0, 0);
-        Imgproc.threshold(eyeROI, eyeROI, 64, 255, Imgproc.THRESH_BINARY);
+//        niBlackThreshold(eyeROI, eyeROI, 255, 31, -0.2);
+        Imgproc.threshold(eyeROI, eyeROI, 69, 255, Imgproc.THRESH_BINARY);
 
-//        Mat progressMat = new Mat(eye.height, eye.width, CvType.CV_8UC4);
-//        Imgproc.cvtColor(eyeROI, progressMat, Imgproc.COLOR_GRAY2RGBA);
-//        progressMat.copyTo(inputImage.submat(new Rect(0, 0, eye.width, eye.height)));
-//        progressMat.release();
+        Imgproc.erode(eyeROI, eyeROI, new Mat(), new Point(-1, -1), 2);
+        Imgproc.dilate(eyeROI, eyeROI, new Mat(), new Point(-1, -1), 4);
+        Imgproc.medianBlur(eyeROI, eyeROI, 5);
 
+        MatOfKeyPoint blob = new MatOfKeyPoint();
+        FeatureDetector detector = FeatureDetector.create(FeatureDetector.SIMPLEBLOB);
+        detector.detect(eyeROI, blob);
+
+        for(KeyPoint point : blob.toArray()) {
+            Point center = point.pt;
+            center.x *= PUPIL_SCALE;
+            center.y *= PUPIL_SCALE;
+
+            int size = (int) (point.size * PUPIL_SCALE);
+            center.x += eye.x * PUPIL_SCALE;
+            center.y += eye.y * PUPIL_SCALE;
+            //Log.d(TAG, "+b: " + b);
+            Imgproc.circle(inputImage, center, size, new Scalar(0, 255, 255), 1);
+        }
+
+        eyeROI.release();
+    }
+
+    private void niBlackThreshold(Mat src, Mat dst, double maxValue, int blockSize, double k) {
+        Mat thresh = new Mat();
+        Mat mean = new Mat();
+        Mat sqmean = new Mat();
+        Mat variance = new Mat();
+        Mat stddev = new Mat();
+
+        Imgproc.boxFilter(src, mean, CvType.CV_32F, new Size(blockSize, blockSize),
+                new Point(-1, -1), true, Core.BORDER_REPLICATE);
+        Imgproc.sqrBoxFilter(src, sqmean, CvType.CV_32F, new Size(blockSize, blockSize),
+                new Point(-1, -1), true, Core.BORDER_REPLICATE);
+
+        Core.subtract(sqmean, mean.mul(mean), variance);
+        Core.sqrt(variance, stddev);
+
+        // BINARIZATION_NIBLACK
+        Core.multiply(stddev, new Scalar(k), thresh);
+        Core.add(mean, thresh, thresh);
+
+        thresh.convertTo(thresh, src.depth());
+
+        Mat mask = new Mat();
+        Core.compare(src, thresh, mask, Core.CMP_GT);
+        dst.setTo(new Scalar(0));
+        dst.setTo(new Scalar(maxValue), mask);
+
+        thresh.release();
+        mean.release();
+        sqmean.release();
+        variance.release();
+        stddev.release();
+        mask.release();
     }
 
     private Rect getEyeRect(Mat faceROI, Rect eye) {
