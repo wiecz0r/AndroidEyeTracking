@@ -153,9 +153,6 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
             Log.d(TAG, "Eye: " + eye.toString());
 
             detectPupil(inputImage, eye);
-
-            // debug only
-            break;
         }
 
         faceROI.release();
@@ -163,9 +160,9 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private void detectPupil(Mat inputImage, Rect eye) {
         eye.x /= PUPIL_SCALE;
-        eye.y /= PUPIL_SCALE;
+        eye.y = (eye.y + eye.height / 4) / PUPIL_SCALE;
         eye.width /= PUPIL_SCALE;
-        eye.height /= PUPIL_SCALE;
+        eye.height = 3 * (eye.height / 4) / PUPIL_SCALE;
 
         Mat eyeROI = pupilStepImage.submat(eye);
 
@@ -180,12 +177,18 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         FeatureDetector detector = FeatureDetector.create(FeatureDetector.SIMPLEBLOB);
         detector.detect(eyeROI, blob);
 
-        for(KeyPoint point : blob.toArray()) {
-            Point center = point.pt;
+        KeyPoint[] pupilsArray = blob.toArray();
+
+        for(KeyPoint point : pupilsArray) {
+            int size = (int) (point.size * PUPIL_SCALE);
+            if (point.size * 2 > eye.width) {
+                continue;
+            }
+
+            Point center = point.pt.clone();
             center.x *= PUPIL_SCALE;
             center.y *= PUPIL_SCALE;
 
-            int size = (int) (point.size * PUPIL_SCALE);
             center.x += eye.x * PUPIL_SCALE;
             center.y += eye.y * PUPIL_SCALE;
             //Log.d(TAG, "+b: " + b);
