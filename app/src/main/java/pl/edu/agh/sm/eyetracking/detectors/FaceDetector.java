@@ -23,7 +23,7 @@ public class FaceDetector {
     private Frame frame;
     private SquareRegion region;
 
-    private int skippedFrames = MAX_SKIPPED_FRAMES;
+    private int skippedFrames = 0;
 
     private boolean initialized;
 
@@ -38,6 +38,10 @@ public class FaceDetector {
     }
 
     public Rect detect(CameraBridgeViewBase.CvCameraViewFrame originalFrame) {
+        if (!initialized) {
+            return null;
+            // or: throw exception
+        }
         frame.update(originalFrame);
 
         Mat frameMat = frame.get();

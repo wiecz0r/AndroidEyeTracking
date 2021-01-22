@@ -15,6 +15,7 @@ import java.util.List;
 
 import pl.edu.agh.sm.eyetracking.Frame;
 import pl.edu.agh.sm.eyetracking.SquareRegion;
+import pl.edu.agh.sm.eyetracking.util.Point;
 import pl.edu.agh.sm.eyetracking.util.Scale;
 import pl.edu.agh.sm.eyetracking.util.Size;
 
@@ -30,7 +31,7 @@ public class EyeDetector {
     private SquareRegion leftEyeRegion;
     private SquareRegion rightEyeRegion;
 
-    private int skippedFrames = MAX_SKIPPED_FRAMES;
+    private int skippedFrames = 0;
 
     private boolean initialized;
 
@@ -46,6 +47,10 @@ public class EyeDetector {
     }
 
     public Pair<Rect, Rect> detect(CameraBridgeViewBase.CvCameraViewFrame originalFrame, Rect faceROI) {
+        if (!initialized) {
+            return new Pair<>(null, null);
+            // or: throw exception
+        }
         frame.update(originalFrame);
 
         Scale.scaleDown(faceROI, SCALE);
@@ -80,23 +85,26 @@ public class EyeDetector {
         if (potentialLeftEyes.isEmpty() && potentialRightEyes.isEmpty()) {
             if (skippedFrames == 0) {
                 Log.d(TAG, "No eyes detected for " + MAX_SKIPPED_FRAMES + " frames");
-                return null;
+                return new Pair<>(null, null);
                 // or: throw exception
             }
             skippedFrames--;
         }
 
+        Scale.scaleUp(faceROI, SCALE);
+        Point faceOffset = new Point(faceROI.x, faceROI.y);
+
         if (!potentialLeftEyes.isEmpty()) {
-            updateRegion(leftEyeRegion, potentialLeftEyes, faceROI);
-            Log.d(TAG, "Left eye region updated: " + leftEyeRegion.get().toString());
+            updateRegion(leftEyeRegion, potentialLeftEyes);
+            Log.d(TAG, "Left eye region updated: " + leftEyeRegion.get(faceOffset).toString());
         }
         else {
             Log.d(TAG, "Left eye region reused");
         }
 
         if (!potentialRightEyes.isEmpty()) {
-            updateRegion(rightEyeRegion, potentialRightEyes, faceROI);
-            Log.d(TAG, "Right eye region updated: " + leftEyeRegion.get().toString());
+            updateRegion(rightEyeRegion, potentialRightEyes);
+            Log.d(TAG, "Right eye region updated: " + leftEyeRegion.get(faceOffset).toString());
         }
         else {
             Log.d(TAG, "Right eye region reused");
@@ -106,19 +114,16 @@ public class EyeDetector {
             skippedFrames = MAX_SKIPPED_FRAMES;
         }
 
-        return new Pair<>(leftEyeRegion.get(), rightEyeRegion.get());
+        return new Pair<>(leftEyeRegion.get(faceOffset), rightEyeRegion.get(faceOffset));
     }
 
-    private void updateRegion(SquareRegion region, List<Rect> potentialEyes, Rect faceROI) {
+    private void updateRegion(SquareRegion region, List<Rect> potentialEyes) {
         Rect biggestEye = potentialEyes.get(0);
         for (Rect rect : potentialEyes) {
             if (rect.area() > biggestEye.area()) {
                 biggestEye = rect;
             }
         }
-
-        biggestEye.x += faceROI.x;
-        biggestEye.y += faceROI.y;
         Scale.scaleUp(biggestEye, SCALE);
 
         region.update(biggestEye);
@@ -130,6 +135,8 @@ public class EyeDetector {
         }
         frame.release();
 
+        leftEyeRegion = null;
+        rightEyeRegion = null;
         frame = null;
         initialized = false;
     }

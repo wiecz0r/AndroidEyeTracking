@@ -40,8 +40,12 @@ public class SquareRegion {
     }
 
     public Rect get() {
-        int x = getLeftCornerX();
-        int y = getLeftCornerY();
+        return get(new Point(0, 0));
+    }
+
+    public Rect get(Point offset) {
+        int x = getLeftCornerX() + offset.x;
+        int y = getLeftCornerY() + offset.y;
         int width = sideLength;
         int height = sideLength;
 

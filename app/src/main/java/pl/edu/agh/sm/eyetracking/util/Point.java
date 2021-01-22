@@ -9,6 +9,10 @@ public class Point {
         this.y = y;
     }
 
+    public org.opencv.core.Point toOpenCV() {
+        return new org.opencv.core.Point(x, y);
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;
