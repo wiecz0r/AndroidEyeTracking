@@ -1,4 +1,4 @@
-package pl.edu.agh.sm.eyetracking;
+package pl.edu.agh.sm.eyetracking.detectors;
 
 import android.util.Log;
 
@@ -8,6 +8,9 @@ import org.opencv.core.MatOfRect;
 import org.opencv.core.Rect;
 import org.opencv.objdetect.CascadeClassifier;
 
+import pl.edu.agh.sm.eyetracking.Frame;
+import pl.edu.agh.sm.eyetracking.SquareRegion;
+import pl.edu.agh.sm.eyetracking.util.Scale;
 import pl.edu.agh.sm.eyetracking.util.Size;
 
 public class FaceDetector {
@@ -31,15 +34,16 @@ public class FaceDetector {
     public void initialize(Size screenSize) {
         frame = new Frame(screenSize, SCALE);
         region = new SquareRegion(screenSize);
+        initialized = true;
     }
 
     public Rect detect(CameraBridgeViewBase.CvCameraViewFrame originalFrame) {
         frame.update(originalFrame);
 
-        Mat image = frame.get();
+        Mat frameMat = frame.get();
         MatOfRect faces = new MatOfRect();
         classifier.detectMultiScale(
-                image,
+                frameMat,
                 faces,
                 1.1 //,
 //                2,
@@ -50,7 +54,7 @@ public class FaceDetector {
 
         if (faces.toArray().length == 0) {
             if (skippedFrames == 0) {
-                Log.d(TAG, "No face detected for " + MAX_SKIPPED_FRAMES + "frames");
+                Log.d(TAG, "No face detected for " + MAX_SKIPPED_FRAMES + " frames");
                 return null;
                 // or: throw exception
             }
@@ -62,23 +66,21 @@ public class FaceDetector {
 
         skippedFrames = MAX_SKIPPED_FRAMES;
 
-        Rect biggestFace = getBiggestFace(faces);
-        Utils.scale(biggestFace, SCALE);
-
-        region.update(biggestFace);
-
+        updateRegion(faces);
         Log.d(TAG, "Face region updated: " + region.get().toString());
         return region.get();
     }
 
-    private Rect getBiggestFace(MatOfRect faces) {
+    private void updateRegion(MatOfRect faces) {
         Rect biggestFace = faces.toArray()[0];
         for (Rect rect : faces.toArray()) {
             if (rect.area() > biggestFace.area()) {
                 biggestFace = rect;
             }
         }
-        return biggestFace;
+        Scale.scaleUp(biggestFace, SCALE);
+
+        region.update(biggestFace);
     }
 
     public void deinitialize() {

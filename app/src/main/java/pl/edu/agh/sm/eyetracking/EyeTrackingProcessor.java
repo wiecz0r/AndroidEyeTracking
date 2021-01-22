@@ -1,6 +1,6 @@
 package pl.edu.agh.sm.eyetracking;
 
-import android.util.Log;
+import androidx.core.util.Pair;
 
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.core.Core;
@@ -8,7 +8,6 @@ import org.opencv.core.CvType;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
-import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
@@ -16,6 +15,8 @@ import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 
+import pl.edu.agh.sm.eyetracking.detectors.EyeDetector;
+import pl.edu.agh.sm.eyetracking.detectors.FaceDetector;
 import pl.edu.agh.sm.eyetracking.util.Size;
 
 
@@ -23,17 +24,12 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private static final String TAG = EyeTrackingProcessor.class.getCanonicalName();
 
-    public static final int EYE_SCALE = 4;
     public static final int PUPIL_SCALE = 2;
 
     private final FaceDetector faceDetector;
-    
-    private final CascadeClassifier eyeDetector;
+    private final EyeDetector eyeDetector;
 
     private Mat outputImage;
-
-    private Mat eyeStepImage;
-    private Size eyeStepImageSize;
 
     private Mat pupilStepImage;
     private Size pupilStepImageSize;
@@ -41,7 +37,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     public EyeTrackingProcessor(CascadeClassifier faceClassifier, CascadeClassifier eyeClassifier) {
         faceDetector = new FaceDetector(faceClassifier);
-        eyeDetector = eyeClassifier;
+        eyeDetector = new EyeDetector(eyeClassifier);
     }
 
     @Override
@@ -50,14 +46,10 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
         outputImage = new Mat(screenSize.toOpenCV(), CvType.CV_8UC4);
 
         faceDetector.initialize(screenSize);
-        
-        int scaledWidth = width / EYE_SCALE;
-        int scaledHeight = height / EYE_SCALE;
-        eyeStepImageSize = new Size(scaledWidth, scaledHeight);
-        eyeStepImage = new Mat(eyeStepImageSize.toOpenCV(), CvType.CV_8UC1);
+        eyeDetector.initialize(screenSize);
 
-        scaledWidth = width / PUPIL_SCALE;
-        scaledHeight = height / PUPIL_SCALE;
+        int scaledWidth = width / PUPIL_SCALE;
+        int scaledHeight = height / PUPIL_SCALE;
         pupilStepImageSize = new Size(scaledWidth, scaledHeight);
         pupilStepImage = new Mat(pupilStepImageSize.toOpenCV(), CvType.CV_8UC1);
     }
@@ -65,8 +57,8 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     @Override
     public void onCameraViewStopped() {
         pupilStepImage.release();
-        eyeStepImage.release();
 
+        eyeDetector.deinitialize();
         faceDetector.deinitialize();
         
         outputImage.release();
@@ -81,56 +73,25 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
     private void process(CameraBridgeViewBase.CvCameraViewFrame frame) {
         Mat inputImage = frame.rgba();
         
-        Imgproc.resize(frame.gray(), eyeStepImage, eyeStepImageSize.toOpenCV());
         Imgproc.resize(frame.gray(), pupilStepImage, pupilStepImageSize.toOpenCV());
 
         Rect faceROI = faceDetector.detect(frame);
 
         if (faceROI != null) {
             drawRectangle(inputImage, faceROI, new Scalar(255, 0, 0), 3);
-            detectEyes(inputImage, faceROI);
+
+            Pair<Rect, Rect> eyeROIs = eyeDetector.detect(frame, faceROI);
+
+            if (eyeROIs != null) {
+                drawRectangle(inputImage, eyeROIs.first, new Scalar(0, 255, 0), 2);
+                drawRectangle(inputImage, eyeROIs.second, new Scalar(0, 255, 128), 2);
+            }
         }
 
         Core.flip(inputImage, inputImage, 1);
 
         inputImage.copyTo(outputImage);
         inputImage.release();
-    }
-
-    private void detectEyes(Mat inputImage, Rect face) {
-        face.x /= EYE_SCALE;
-        face.y /= EYE_SCALE;
-        face.width /= EYE_SCALE;
-        face.height /= EYE_SCALE;
-
-        Mat faceROI = eyeStepImage.submat(face);
-        MatOfRect eyes = new MatOfRect();
-        eyeDetector.detectMultiScale(
-                faceROI,
-                eyes,
-                1.1
-        );
-
-        Rect[] eyesArray = eyes.toArray();
-        //Log.d(TAG, String.valueOf(eyesArray.length));
-
-        // iterate detected eyes
-        for (Rect rect : eyesArray) {
-            Rect eye = getEyeRect(faceROI, rect);
-
-            eye.x *= EYE_SCALE;
-            eye.y *= EYE_SCALE;
-            eye.width *= EYE_SCALE;
-            eye.height *= EYE_SCALE;
-
-            // draw green rectangle for detected eye
-            drawRectangle(inputImage, eye, new Scalar(0, 255, 0), 2);
-            Log.d(TAG, "Eye: " + eye.toString());
-
-            detectPupil(inputImage, eye);
-        }
-
-        faceROI.release();
     }
 
     private void detectPupil(Mat inputImage, Rect eye) {
@@ -207,15 +168,6 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 //        stddev.release();
 //        mask.release();
 //    }
-
-
-    private Rect getEyeRect(Mat faceROI, Rect eye) {
-        Point p1 = new Point(0, 0);
-        faceROI.locateROI(null, p1);
-        eye.x += p1.x;
-        eye.y += p1.y;
-        return eye;
-    }
 
 
     private void drawRectangle(Mat inputImage, Rect rect, Scalar color, int thickness) {
