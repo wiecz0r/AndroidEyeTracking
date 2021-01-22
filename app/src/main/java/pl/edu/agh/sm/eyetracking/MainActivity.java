@@ -2,7 +2,6 @@ package pl.edu.agh.sm.eyetracking;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -11,9 +10,9 @@ import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.objdetect.CascadeClassifier;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
+import java.io.IOException;
+
+import pl.edu.agh.sm.eyetracking.util.ClassifierLoader;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -21,16 +20,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getCanonicalName();
 
     private FrontalCameraView cameraBridgeViewBase;
-    private EyeTrackingProcessor eyeTrackingProcessor;
-    private CascadeClassifier faceDetector;
-    private CascadeClassifier eyeDetector;
+    private final ClassifierLoader loader;
 
     private final BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
             switch (status) {
                 case LoaderCallbackInterface.SUCCESS:
-                    loadClassifier();
+                    loadClassifiers();
                     enableCameraView();
                     break;
                 default:
@@ -39,6 +36,27 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+    public MainActivity() {
+        loader = new ClassifierLoader(this);
+    }
+
+    private void loadClassifiers() {
+        try {
+            CascadeClassifier faceClassifier = loader.load(
+                    R.raw.haarcascade_frontalface_alt2,
+                    "haarcascade_frontalface_alt2.xml");
+
+            CascadeClassifier eyeClassifier = loader.load(
+                    R.raw.haarcascade_eye,
+                    "haarcascade_eye.xml");
+
+            EyeTrackingProcessor eyeTrackingProcessor = new EyeTrackingProcessor(faceClassifier, eyeClassifier);
+            cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,40 +95,6 @@ public class MainActivity extends AppCompatActivity {
         disableCameraView();
     }
 
-    private void loadClassifier() {
-        File cascadeFile = loadFile(R.raw.haarcascade_frontalface_alt2, "cascade", "haarcascade_frontalface_alt2.xml");
-        File eyeFile = loadFile(R.raw.haarcascade_eye, "landmark", "haarcascade_eye.xml");
-
-        faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
-        faceDetector.load(cascadeFile.getAbsolutePath());
-
-        eyeDetector = new CascadeClassifier(eyeFile.getAbsolutePath());
-        eyeDetector.load(eyeFile.getAbsolutePath());
-
-        eyeTrackingProcessor = new EyeTrackingProcessor(faceDetector, eyeDetector);
-        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
-    }
-
-    private File loadFile(int resource, String dir, String filename) {
-        try {
-            InputStream is = getResources().openRawResource(resource);
-            File directory = getDir(dir, Context.MODE_PRIVATE);
-            File file = new File(directory, filename);
-            FileOutputStream fos = new FileOutputStream(file);
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                fos.write(buffer, 0, bytesRead);
-            }
-            is.close();
-            fos.close();
-            directory.delete();
-            return file;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
 
     private void enableCameraView() {
         if (cameraBridgeViewBase == null) {
