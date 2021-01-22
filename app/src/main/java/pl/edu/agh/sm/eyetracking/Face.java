@@ -5,6 +5,9 @@ import org.opencv.core.Rect;
 
 public class Face {
 
+    public static final int SCALE = 8;
+
+
     private Point center;
     private Integer size;
 
@@ -39,7 +42,15 @@ public class Face {
     }
 
     public Rect getRect() {
-        return new Rect((int) getX(), (int) getY(), getSize(), getSize());
+        Rect roi = new Rect((int) getX(), (int) getY(), getSize(), getSize());
+        scale(roi);
+        return roi;
     }
 
+    private static void scale(Rect rect) {
+        rect.x *= SCALE;
+        rect.y *= SCALE;
+        rect.width *= SCALE;
+        rect.height *= SCALE;
+    }
 }
