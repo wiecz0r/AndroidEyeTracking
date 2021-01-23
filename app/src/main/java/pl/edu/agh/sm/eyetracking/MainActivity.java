@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.SeekBar;
+import android.widget.TextView;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
@@ -21,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getCanonicalName();
 
     private SeekBar thresholdSeekBar;
+    private TextView thresholdLabel;
     private FrontalCameraView cameraBridgeViewBase;
 
     private final ClassifierLoader loader;
@@ -47,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
             if (cameraBridgeViewBase == null) {
                 return;
             }
+            thresholdLabel.setText(Integer.toString(progress));
             eyeTrackingProcessor.setThreshold(progress);
         }
 
@@ -87,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
         cameraBridgeViewBase = findViewById(R.id.frontal_camera_view);
 //        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
 
+        thresholdLabel = findViewById(R.id.threshold_label);
         thresholdSeekBar = findViewById(R.id.threshold_seek_bar);
         thresholdSeekBar.setOnSeekBarChangeListener(seekBarChangeListener);
     }

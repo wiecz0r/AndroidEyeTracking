@@ -41,14 +41,14 @@ public class PupilDetector {
                 screenSize,
                 new Point(0, 0),
                 screenSize.width / 64,
-                1,
+                0,
                 1
         );
         rightPupilRegion = new CircleRegion(
                 screenSize,
                 new Point(0, 0),
                 screenSize.width / 64,
-                1,
+                0,
                 1
         );
 
@@ -106,7 +106,8 @@ public class PupilDetector {
 
         if (potentialPupils.isEmpty()) {
             Log.d(TAG, "No pupil detected");
-            return region.get(eyeOffset);
+//            return region.get(eyeOffset);
+            return null;
         }
 
         updateRegion(region, potentialPupils);
