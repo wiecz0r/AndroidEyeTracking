@@ -110,11 +110,7 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
 
     private void visualiseTracking(Mat inputImage, Rect eyeROI, Circle pupilROI) {
         Point pupilCenter = new Point(eyeROI.x + eyeROI.width / 2, eyeROI.y + eyeROI.height / 2);
-        Imgproc.arrowedLine(inputImage,
-                pupilCenter.toOpenCV(),
-                pupilROI.center.toOpenCV(),
-                new Scalar(255, 255, 0),
-                2);
+        drawArrow(inputImage, pupilCenter, pupilROI.center, new Scalar(255, 255, 0), 2);
 
         Point arrowStart = new Point(
                 pupilCenter.x,
@@ -129,11 +125,15 @@ public class EyeTrackingProcessor implements CameraBridgeViewBase.CvCameraViewLi
                 arrowStart.y + deltaY
         );
 
+        drawArrow(inputImage, arrowStart, arrowEnd, new Scalar(24, 24, 24), 4);
+    }
+
+    private void drawArrow(Mat inputImage, Point start, Point end, Scalar color, int thickness) {
         Imgproc.arrowedLine(inputImage,
-                arrowStart.toOpenCV(),
-                arrowEnd.toOpenCV(),
-                new Scalar(255, 255, 0),
-                4);
+                start.toOpenCV(),
+                end.toOpenCV(),
+                color,
+                thickness);
     }
 
     private void drawRectangle(Mat inputImage, Rect rect, Scalar color, int thickness) {
