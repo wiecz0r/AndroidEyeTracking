@@ -7,20 +7,19 @@ import pl.edu.agh.sm.eyetracking.util.Size;
 
 public class SquareRegion {
 
-    private static final int EPS_CENTER = 2 * 8;
-    private static final int EPS_SIZE = 5 * 8;
-
     private Point center;
     private int sideLength;
+    private final int centerEpsilon;
+    private final int sideEpsilon;
 
     private final Size screenSize;
 
-    public SquareRegion(Size screenSize) {
+    public SquareRegion(Size screenSize, Point center, int side, int centerEpsilon, int sideEpsilon) {
         this.screenSize = screenSize;
-
-        // default face size
-        center = new Point(screenSize.width / 2, screenSize.height / 2);
-        sideLength = screenSize.width / 4;
+        this.center = center;
+        this.sideLength = side;
+        this.centerEpsilon = centerEpsilon;
+        this.sideEpsilon = sideEpsilon;
     }
 
     public void update(Rect region) {
@@ -29,12 +28,12 @@ public class SquareRegion {
                 region.y + (region.height / 2)
         );
 
-        if (Math.abs(potentialCenter.x - center.x) > EPS_CENTER
-                || Math.abs(potentialCenter.y - center.y) > EPS_CENTER) {
+        if (Math.abs(potentialCenter.x - center.x) > centerEpsilon
+                || Math.abs(potentialCenter.y - center.y) > centerEpsilon) {
             center = potentialCenter;
         }
 
-        if (Math.abs(region.width - sideLength) > EPS_SIZE) {
+        if (Math.abs(region.width - sideLength) > sideEpsilon) {
             sideLength = region.width;
         }
     }

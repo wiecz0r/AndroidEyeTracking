@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.SeekBar;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
@@ -19,8 +20,11 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getCanonicalName();
 
+    private SeekBar thresholdSeekBar;
     private FrontalCameraView cameraBridgeViewBase;
+
     private final ClassifierLoader loader;
+    private EyeTrackingProcessor eyeTrackingProcessor;
 
     private final BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -37,6 +41,22 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private final SeekBar.OnSeekBarChangeListener seekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            if (cameraBridgeViewBase == null) {
+                return;
+            }
+            eyeTrackingProcessor.setThreshold(progress);
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {}
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {}
+    };
+
     public MainActivity() {
         loader = new ClassifierLoader(this);
     }
@@ -51,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
                     R.raw.haarcascade_eye,
                     "haarcascade_eye.xml");
 
-            EyeTrackingProcessor eyeTrackingProcessor = new EyeTrackingProcessor(faceClassifier, eyeClassifier);
+            eyeTrackingProcessor = new EyeTrackingProcessor(faceClassifier, eyeClassifier);
             cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
         } catch (IOException e) {
             e.printStackTrace();
@@ -66,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
 
         cameraBridgeViewBase = findViewById(R.id.frontal_camera_view);
 //        cameraBridgeViewBase.setCvCameraViewListener(eyeTrackingProcessor);
+
+        thresholdSeekBar = findViewById(R.id.threshold_seek_bar);
+        thresholdSeekBar.setOnSeekBarChangeListener(seekBarChangeListener);
     }
 
     @Override

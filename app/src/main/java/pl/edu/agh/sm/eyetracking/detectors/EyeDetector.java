@@ -41,8 +41,20 @@ public class EyeDetector {
 
     public void initialize(Size screenSize) {
         frame = new Frame(screenSize, SCALE);
-        leftEyeRegion = new SquareRegion(screenSize);
-        rightEyeRegion = new SquareRegion(screenSize);
+        leftEyeRegion = new SquareRegion(
+                screenSize,
+                new Point(screenSize.width / 16, screenSize.height / 8),
+                screenSize.width / 16,
+                2 * SCALE,
+                5 * SCALE
+        );
+        rightEyeRegion = new SquareRegion(
+                screenSize,
+                new Point(3 * screenSize.width / 16, screenSize.height / 8),
+                screenSize.width / 16,
+                2 * SCALE,
+                5 * SCALE
+        );
         initialized = true;
     }
 

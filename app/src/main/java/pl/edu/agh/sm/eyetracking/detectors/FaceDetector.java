@@ -10,6 +10,7 @@ import org.opencv.objdetect.CascadeClassifier;
 
 import pl.edu.agh.sm.eyetracking.Frame;
 import pl.edu.agh.sm.eyetracking.SquareRegion;
+import pl.edu.agh.sm.eyetracking.util.Point;
 import pl.edu.agh.sm.eyetracking.util.Scale;
 import pl.edu.agh.sm.eyetracking.util.Size;
 
@@ -33,7 +34,14 @@ public class FaceDetector {
 
     public void initialize(Size screenSize) {
         frame = new Frame(screenSize, SCALE);
-        region = new SquareRegion(screenSize);
+        region = new SquareRegion(
+                screenSize,
+                new Point(screenSize.width / 2, screenSize.height / 2),
+                screenSize.width / 4,
+                2 * SCALE,
+                5 * SCALE
+        );
+
         initialized = true;
     }
 
